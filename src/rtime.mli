@@ -57,8 +57,8 @@ val progress : ?exec:bool -> t -> unit
 
     The schedule and the occurence time may not coincide. *)
 
-val stamp : ?stop:'a React.E.t -> (time -> time -> 'b) -> t -> time -> 
-  'b React.E.t
+val stamp : ?stop:'a React.event -> (time -> time -> 'b) -> t -> time -> 
+  'b React.event
 (** [stamp stop occ l t] is an event such that :
     {ol 
     {- A single occurence is scheduled for [t] on [l].}
@@ -67,8 +67,8 @@ val stamp : ?stop:'a React.E.t -> (time -> time -> 'b) -> t -> time ->
        (existing deadlines are removed) or if [t] is earlier than [now l] 
     when [stamp] gets executed.}}*)
 
-val stamps : ?stop:'a React.E.t -> ?start:time -> 
-  (time -> time -> ('b * time)) -> t -> 'b React.E.t
+val stamps : ?stop:'a React.event -> ?start:time -> 
+  (time -> time -> ('b * time)) -> t -> 'b React.event
 (** [stamps stop start occ l] is an event such that :
     {ol
     {- The first occurence is scheduled for [start] (defaults to [now l]).}
@@ -81,16 +81,16 @@ val stamps : ?stop:'a React.E.t -> ?start:time ->
     
 (** {1:delays Delays} *)
 
-val delay_e : ?stop:'a React.E.t -> t -> duration -> 'b React.E.t -> 
-  'b React.E.t
+val delay_e : ?stop:'a React.event -> t -> duration -> 'b React.event -> 
+  'b React.event
 (** [delay_e stop l d e] is an event such that : 
     {ol
     {- Occurences are those of [e] delayed by [d] units of time on [l].}
     {- No occurences are generated after [stop] occurs (existing deadlines
        are removed).}} *)
 
-val delay_s : ?eq:('b -> 'b -> bool) -> ?stop:'a React.E.t -> t -> duration -> 
-  'b -> 'b React.S.t -> 'b React.S.t
+val delay_s : ?eq:('b -> 'b -> bool) -> ?stop:'a React.event -> t -> 
+  duration -> 'b -> 'b React.signal -> 'b React.signal
 (** [delay_s eq stop l d i s] is :
     {[S.hold ?eq i (S.delay stop l d (S.changes s))]}*)
 (** {1:ex Examples}
