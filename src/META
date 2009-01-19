@@ -1,0 +1,7 @@
+version = "%%VERSION%%"
+description = "%%SHORTDESCRIPTION%%"
+requires = "unix,react"
+archive(byte) = "%%PROJECTNAME%%.cmo"
+archive(native) = "%%PROJECTNAME%%.cmx"
+archive(plugin,native) = "%%PROJECTNAME%%.cmxs"
+directory = "+%%PROJECTNAME%%"

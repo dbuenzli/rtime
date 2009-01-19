@@ -1,0 +1,10 @@
+#directory "_build/src";;
+#directory "_build/test";;
+#directory "+react";;
+#directory "+threads"
+#load "unix.cma"
+#load "threads.cma"
+#load "react.cmo";;
+#load "rtime.cmo";;
+
+open React;;

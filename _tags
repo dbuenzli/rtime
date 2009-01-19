@@ -1,0 +1,5 @@
+<**/*.ml> : annot
+<src> : include
+<test> : include
+<test/*> : debug, thread
+<test/test.{native,byte}> : use_unix
