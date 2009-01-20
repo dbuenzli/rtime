@@ -9,7 +9,7 @@ timelines. The client chooses the concrete timeline by providing an
 absolute notion of time. Running the timeline at the appropriate pace
 is left to the client.
 
-Rtime is made of a single module and depends on React*. It is
+Rtime is made of a single module and depends on React. It is
 distributed under the new BSD license.
 
 [1] available at http://erratique.ch/software/react
