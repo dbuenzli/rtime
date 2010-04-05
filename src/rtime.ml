@@ -61,10 +61,12 @@ module Heap = struct            (* classical imperative heap implementation. *)
   let rec rem_last_but_not_first l =     (* N.B. drops cancelled deadlines. *)
     if l.heap_size = 1 then None else
     let i = l.heap_size - 1 in
-    let d = match l.heap.(i) with Some d -> d | None -> assert false in
-    l.heap.(i) <- None;
-    l.heap_size <- i;
-    if !(d.cancelled) then rem_last_but_not_first l else Some d
+    match l.heap.(i) with 
+    | Some d as r -> 
+	l.heap.(i) <- None;
+	l.heap_size <- i;
+	if !(d.cancelled) then rem_last_but_not_first l else r
+    | None -> assert false
 
   let _take l = 
     if l.heap_size = 0 then None else
