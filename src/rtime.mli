@@ -31,7 +31,10 @@ val create : ?earlier:(t -> unit) -> (unit -> time) -> t
     defined by calling the function [now]. [earlier] is called with
     the timeline as an argument whenever a new deadline is scheduled
     before all the others on the line; this can be used to unblock a
-    sleeping thread. *)
+    sleeping thread. 
+
+    {b Warning} [earlier] must not perform React update cycles (because
+    it may very likely be called during an update cycle). *)
 
 val now : t -> time
 (** [now l] is the current time on the timeline. *)
@@ -131,11 +134,86 @@ val delay_s : ?eq:('b -> 'b -> bool) -> ?stop:'a React.event -> t ->
     let i = ceil ((t -. first) /. p) in
     if i >= max then 1., t (* stop *) else (i *. np), (first +. i *. p)
   in
-  React.S.hold 0. (Rtime.stamps ?stop ~start:first occ l)]}
-
+  React.S.hold 0. (Rtime.stamps ?stop ~start:first occ l)
+]}
     {2:unixtimeline Running a UNIX timeline}
 
-    We show how to run a UNIX timeline in a dedicated thread.  
+    The following examples show different techniques to run a UNIX timeline.
+    {3:select Single threaded program with Unix.select}
+
+    The application [run l] executes all expired deadlines on the
+    timeline [l] and returns the next deadline or a negative value if
+    there's no deadline.
+{[let rec run l = match Rtime.wakeup l with
+| None -> -1. (* unbounded wait *)
+| Some d when d > 0. -> d
+| Some _ -> Rtime.progress l; run l
+]}
+    The main function creates a timeline using {!Unix.gettimeofday}
+    for the absolute time, initializes input and ouput descriptors
+    and enters an infinite loop that runs the timeline and waits 
+    with {!Unix.select} on descriptor events or timeline deadlines.
+{[let main () = 
+  let unix_timeline = Rtime.create Unix.gettimeofday in
+  let r, w, e = ... (* init. descriptors *) in
+  while true do 
+    let delay = run unix_timeline in 
+    let r', w', e' = Unix.select !r !w !e delay in 
+    ... (* handle descriptor events *)
+  done
+]}
+    {3:itimer Single threaded program with interval timers}    
+
+    The application [run l] executes all expired deadlines
+    on the timeline [l] and installs a timer to send the {!Sys.sigalrm}
+    signal on the next deadline or does nothing if there's no deadline.
+{[let rec run l = match Rtime.wakeup l with 
+  | None -> ()
+  | Some d when d > 0. ->
+    let s = { Unix.it_interval = 0.; it_value = d } in
+    ignore (Unix.setitimer Unix.ITIMER_REAL s)
+  | Some _ -> Rtime.progress l; run l
+]}
+    The idea is to install a handler for {!Sys.sigalrm} that notifies
+    the main program that a deadline expired. It is {e very important}
+    that the handler does not try to progress the timeline itself by calling
+    {!progress}, because doing so may violate the mutual exclusion of
+    React's update cycles if the handler is invoked during such a
+    cycle.
+
+    In our example we assume the main loop waits for input with a
+    blocking call that can be unblocked by calling another
+    function. To make that concrete we use
+    {{:http://ocamlsdl.sourceforge.net}OCamlSDL} as an example.  
+
+    The main loop waits indefinitely with {!Sdlevent.wait_event} and
+    whenever the timer expires the handler adds an [Sdlevent.USER]
+    event to the SDL input queue. If the main loop is stuck because
+    there are no SDL events, this will unblock the call to
+    {!Sdlevent.wait_event} and run the timeline. Here is the structure of
+    our main function, the timeline uses {!Unix.gettimeofday} for the
+    absolute time.
+{[let main () = 
+  let unix_timeline = Rtime.create Unix.gettimeofday in
+  let unblock _ = Sdlevent.add [Sdlevent.USER 0] in
+  ... (* init SDL *)
+  Sys.set_signal Sys.sigalrm (Sys.Signal_handle unblock);
+  while true do 
+    run unix_timeline;
+    let e = Sdlevent.wait_event () in 
+    ... (* handle event *)
+  done
+]}
+    In our example the program structure is such that if a new
+    deadline is inserted before the others in the timeline, [run] will
+    be executed shortly after. For this reason our timeline was
+    created without an [earlier] function, if this assumption didn't
+    hold, [earlier] could have just set the timer to the new, earlier,
+    deadline.
+
+    {3:threads Multi-threaded program with interval timers} 
+
+    In this example, we run the timeline in a dedicated thread. 
 
     First, React's update cycles must be executed in a critical
     section. The thread dedicated to the timeline will trigger update
@@ -157,7 +235,8 @@ let e_create () =
 
 let s_create v = 
   let s, set = React.S.create v in 
-  s, mutex set]}
+  s, mutex set
+]}
     Next, we need a mechanism to sleep the thread for a specific 
     amount of time ([sleep]) and a mean to unblock the thread
     from another thread in case an earlier event occurrence gets created 
@@ -171,7 +250,7 @@ let s_create v =
     let s = { Unix.it_interval = 0.; it_value = d } in
     ignore (Unix.setitimer Unix.ITIMER_REAL s)
   in
-  let sleep d =                      (* with d = 0. unbounded sleep. *)
+  let sleep d = (* if d = 0. unbounded sleep *)
     if d < 0. then invalid_arg "negative delay";
     Mutex.lock m; 
     sleeping := true;
@@ -189,21 +268,30 @@ let s_create v =
   let timer _ = sleeping := false; Condition.signal proceed;
   in
   Sys.set_signal Sys.sigalrm (Sys.Signal_handle timer);
-  sleep, earlier]}
-    We can now define a UNIX timeline [l] and a [run] function to 
-    run it. Note the use of the [mutex] function to progress the timeline.
-{[let l = Rtime.create ~earlier Unix.gettimeofday
-let run l = 
-  try
-    while true do match Rtime.wakeup l with
-    | None -> sleep 0.                         (* unbounded sleep. *)
+  sleep, earlier
+]}
+    The application [run l] is an infinite loop that executes expired 
+    deadlines on the timeline [l] (note the use of the [mutex]
+    function to progress the timeline), sleeps the thread until 
+    the next deadline or forever if there's no deadline.
+{[let run l = 
+  while true do 
+    try match Rtime.wakeup l with
+    | None -> sleep 0. (* unbounded sleep *)
     | Some d when d > 0. -> sleep d
     | Some _ -> mutex Rtime.progress l
-    done;
-    assert (false);
-  with e -> e
-
-let run_utime () = Thread.create run l]}
+    with e -> ... (* print or ignore exception to avoid termination *)
+  done;
+  assert (false)
+]}
+    The main function creates a timeline using {!Unix.gettimeofday} for the
+    absolute time and [earlier] to wake up the thread on earlier deadlines 
+    and runs it in a dedicated thread. 
+{[let main () = 
+  let unix_timeline = Rtime.create ~earlier Unix.gettimeofday in
+  let timeline_thread = Thread.create run unix_timeline in
+  ...
+]}
 *)
 (*----------------------------------------------------------------------------
   Copyright (c) %%COPYRIGHTYEAR%%, Daniel C. Bünzli

@@ -29,6 +29,44 @@ let ninterval ?stop ?start freq l d =
 
 (* Running a UNIX timeline *)
 
+(* Single threaded program with Unix.select *)
+
+let rec run l = match Rtime.wakeup l with
+| None -> -1. (* unbounded wait *)
+| Some d when d > 0. -> d
+| Some _ -> Rtime.progress l; run l
+
+let main () = 
+  let unix_timeline = Rtime.create Unix.gettimeofday in
+  let r, w, e = ref [], ref [], ref [] in
+  while true do 
+    let delay = run unix_timeline in 
+    let r', w', e' = Unix.select !r !w !e delay in 
+    ignore (r', w', e')
+  done
+
+(* Single threaded program with interval timers *)
+
+let rec run l = match Rtime.wakeup l with 
+  | None -> ()
+  | Some d when d > 0. ->
+    let s = { Unix.it_interval = 0.; it_value = d } in
+    ignore (Unix.setitimer Unix.ITIMER_REAL s)
+  | Some _ -> Rtime.progress l; run l
+
+let main () = 
+  let unix_timeline = Rtime.create Unix.gettimeofday in
+  let unblock _ = () (* Sdlevent.add [Sdlevent.USER 0] *) in
+  Sys.set_signal Sys.sigalrm (Sys.Signal_handle unblock);
+  while true do 
+    run unix_timeline;
+    let e = () (* Sdlevent.wait_event () *) in 
+    ignore (e)
+  done
+
+
+(* Multi-threaded program with interval timers *)
+
 let mutex = 
   let m = Mutex.create () in 
   fun f v ->
@@ -43,6 +81,7 @@ let s_create v =
   let s, set = React.S.create v in 
   s, mutex set
 
+
 let sleep, earlier = 
   let m = Mutex.create () in
   let proceed = Condition.create () in
@@ -51,7 +90,7 @@ let sleep, earlier =
     let s = { Unix.it_interval = 0.; it_value = d } in
     ignore (Unix.setitimer Unix.ITIMER_REAL s)
   in
-  let sleep d =                     (* with d = 0. unbounded sleep. *)
+  let sleep d = (* if d = 0. unbounded sleep *)
     if d < 0. then invalid_arg "negative delay";
     Mutex.lock m; 
     sleeping := true;
@@ -71,17 +110,19 @@ let sleep, earlier =
   Sys.set_signal Sys.sigalrm (Sys.Signal_handle timer);
   sleep, earlier
 
-let l = Rtime.create ~earlier Unix.gettimeofday
 let run l = 
-  try
-    while true do match Rtime.wakeup l with
-    | None -> sleep 0.                          (* unbounded sleep. *)
+  while true do 
+    try match Rtime.wakeup l with
+    | None -> sleep 0. (* unbounded sleep *)
     | Some d when d > 0. -> sleep d
     | Some _ -> mutex Rtime.progress l
-    done;
-    assert (false);
-  with e -> e
+    with e -> () (* print or ignore exception to avoid termination *)
+  done;
+  assert (false)
 
-let run_utime () = Thread.create run l
+let l = Rtime.create ~earlier Unix.gettimeofday
 
-let () = if !Sys.interactive then ignore (run_utime ())
+let main () = 
+  let unix_timeline = Rtime.create ~earlier Unix.gettimeofday in
+  let timeline_thread = Thread.create run unix_timeline in
+  ignore (timeline_thread)
