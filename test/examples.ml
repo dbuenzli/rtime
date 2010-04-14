@@ -54,15 +54,21 @@ let rec run l = match Rtime.wakeup l with
     ignore (Unix.setitimer Unix.ITIMER_REAL s)
   | Some _ -> Rtime.progress l; run l
 
+let timer_message = ()
+let send_timer_message () = ()
+let wait_message () = ()
+
 let main () = 
-  let unix_timeline = Rtime.create Unix.gettimeofday in
-  let unblock _ = () (* Sdlevent.add [Sdlevent.USER 0] *) in
+  let unblock _ = send_timer_message () in
+  let unix_timeline = Rtime.create ~earlier:unblock Unix.gettimeofday in
   Sys.set_signal Sys.sigalrm (Sys.Signal_handle unblock);
+  run unix_timeline;
   while true do 
-    run unix_timeline;
-    let e = () (* Sdlevent.wait_event () *) in 
-    ignore (e)
+    let m = wait_message () in
+    if m = timer_message then run unix_timeline else 
+    ignore (m);
   done
+
 
 
 (* Multi-threaded program with interval timers *)

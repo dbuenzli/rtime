@@ -141,7 +141,7 @@ val delay_s : ?eq:('b -> 'b -> bool) -> ?stop:'a React.event -> t ->
     The following examples show different techniques to run a UNIX timeline.
     {3:select Single threaded program with Unix.select}
 
-    The application [run l] executes all expired deadlines on the
+    The call [run l] executes all expired deadlines on the
     timeline [l] and returns the next deadline or a negative value if
     there's no deadline.
 {[let rec run l = match Rtime.wakeup l with
@@ -164,7 +164,7 @@ val delay_s : ?eq:('b -> 'b -> bool) -> ?stop:'a React.event -> t ->
 ]}
     {3:itimer Single threaded program with interval timers}    
 
-    The application [run l] executes all expired deadlines
+    The call [run l] executes all expired deadlines
     on the timeline [l] and installs a timer to send the {!Sys.sigalrm}
     signal on the next deadline or does nothing if there's no deadline.
 {[let rec run l = match Rtime.wakeup l with 
@@ -181,36 +181,24 @@ val delay_s : ?eq:('b -> 'b -> bool) -> ?stop:'a React.event -> t ->
     React's update cycles if the handler is invoked during such a
     cycle.
 
-    In our example we assume the main loop waits for input with a
-    blocking call that can be unblocked by calling another
-    function. To make that concrete we use
-    {{:http://ocamlsdl.sourceforge.net}OCamlSDL} as an example.  
-
-    The main loop waits indefinitely with {!Sdlevent.wait_event} and
-    whenever the timer expires the handler adds an [Sdlevent.USER]
-    event to the SDL input queue. If the main loop is stuck because
-    there are no SDL events, this will unblock the call to
-    {!Sdlevent.wait_event} and run the timeline. Here is the structure of
-    our main function, the timeline uses {!Unix.gettimeofday} for the
-    absolute time.
+    In our example below, we assume the main loop waits indefinitely
+    for messages in a queue with a blocking call to [wait_message].
+    Whenever the timer expires the [unblock] handler sends a message
+    to the queue with [send_timer_message]. If the main loop is
+    currently blocked on [wait_message] this will unblock it and run
+    the timeline. The timeline uses {!Unix.gettimeofday} for the
+    absolute time and calls [unblock] if a deadline is inserted before
+    the others to readjust the timer delay.
 {[let main () = 
-  let unix_timeline = Rtime.create Unix.gettimeofday in
-  let unblock _ = Sdlevent.add [Sdlevent.USER 0] in
-  ... (* init SDL *)
+  let unblock _ = send_timer_message () in
+  let unix_timeline = Rtime.create ~earlier:unblock Unix.gettimeofday in
   Sys.set_signal Sys.sigalrm (Sys.Signal_handle unblock);
+  run unix_timeline;
   while true do 
-    run unix_timeline;
-    let e = Sdlevent.wait_event () in 
-    ... (* handle event *)
-  done
-]}
-    In our example the program structure is such that if a new
-    deadline is inserted before the others in the timeline, [run] will
-    be executed shortly after. For this reason our timeline was
-    created without an [earlier] function, if this assumption didn't
-    hold, [earlier] could have just set the timer to the new, earlier,
-    deadline.
-
+    let m = wait_message () in
+    if m = timer_message then run unix_timeline else 
+    ... (* handle other message *)
+  done]}
     {3:threads Multi-threaded program with interval timers} 
 
     In this example, we run the timeline in a dedicated thread. 
@@ -270,7 +258,7 @@ let s_create v =
   Sys.set_signal Sys.sigalrm (Sys.Signal_handle timer);
   sleep, earlier
 ]}
-    The application [run l] is an infinite loop that executes expired 
+    The call [run l] is an infinite loop that executes expired 
     deadlines on the timeline [l] (note the use of the [mutex]
     function to progress the timeline), sleeps the thread until 
     the next deadline or forever if there's no deadline.
