@@ -88,17 +88,6 @@ module Heap = struct            (* classical imperative heap implementation. *)
     | None -> assert false
 end
 
-module Refs = struct
-  let add l r = l.refs <- r :: l.refs
-  let rem l r = 
-    let rec aux acc r = function
-      | [] -> acc 
-      | h :: t when r == h -> List.rev_append acc t
-      | h :: t -> aux (h :: acc) r t
-    in
-    l.refs <- aux [] r l.refs 
-end
-
 (* Creating and running time lines *)
 
 let create ?(earlier = fun _ -> ()) now = 
@@ -151,43 +140,42 @@ let stamps ?(stop = E.never) ?start occ l =
       
 (* Delays *)
 
-(* In contrast to time stamps events a delay event has not always a
-   deadline in the queue while it is active. Storing a reference to
-   the stopper event in the deadline operation is thus not sufficent
-   to prevent garbage collection. This is why we need to keep a
-   reference to the stopper (which keeps a reference to the delayer)
-   in l.refs. *)
+(* In contrast to time stamps events a delayed event or signal has not
+   always a deadline in the queue while it is active. Storing a
+   reference to the stopper and delayer in the deadline operation is thus
+   not sufficent to prevent garbage collection. This is why we retain
+   them in the primitive we create *)
 
 let delay_e ?(stop = E.never) l d e = 
   let de, send_de = E.create () in
   let cancel = ref false in
-  let stopper = ref E.never in
   let delayer = ref E.never in
-  let stop_it _ = cancel := true; E.stop !delayer; Refs.rem l stopper in
+  let stop_it _ = cancel := true; E.stop !delayer in
   let delay v = 
     let send () = send_de v in
     let d = { time = (now l) +. d; cancelled = cancel; operation = send } in
     Heap.add l d
   in  
-  stopper := E.map stop_it stop;
+  let stopper = E.map stop_it stop in 
   delayer := E.map delay e;
-  Refs.add l stopper;                                 (* ref. for the g.c. *)
+  let keep () = ignore (stopper); ignore (!delayer) in
+  ignore (E.retain de keep);
   de
   
 let delay_s ?eq ?(stop = E.never) l d i s =
   let ds, set_ds = S.create ?eq i in
   let cancel = ref false in
-  let stopper = ref E.never in
   let delayer = ref E.never in
-  let stop_it _ = cancel := true; E.stop !delayer; Refs.rem l stopper in
+  let stop_it _ = cancel := true; E.stop !delayer in
   let delay v = 
     let set () = set_ds v in 
     let d = { time = (now l) +. d; cancelled = cancel; operation = set } in 
     Heap.add l d
   in
-  stopper := E.map stop_it stop;
+  let stopper = E.map stop_it stop in
   delayer := E.map delay (S.changes s);
-  Refs.add l stopper;                                  (* ref for the g.c. *)
+  let keep () = ignore (stopper); ignore (!delayer) in
+  ignore (S.retain ds keep); (* ref for the g.c. *);
   ds
 
 (*----------------------------------------------------------------------------
