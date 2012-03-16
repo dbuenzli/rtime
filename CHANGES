@@ -1,9 +1,15 @@
-# Version 0.9,1, 2010-04-15, Paris
+v0.9.2 2012-03-15 La Forclaz (VS)
+---------------------------------
+
+- OASIS support.
+
+v0.9.1 2010-04-15 Paris
+-----------------------
 
 - Fix a gc and leak bug in delay_s and delay_e. 
 - Improved and added examples to run UNIX timelines.
 
+v0.9.0 2009-01-19 Lausanne
+----------------------------
 
-# Version 0.9.0, 2009-01-19, Lausanne
-
-First release.
+- First release.

@@ -1,5 +1,4 @@
-<**/*.ml> : annot
+<**/*.{ml,mli}> : annot, debug, package(react)
 <src> : include
 <test> : include
-<test/*> : debug, thread
-<test/test.{native,byte}> : use_unix
+<test/*> : thread, package(threads), package(unix), package(react)

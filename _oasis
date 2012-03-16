@@ -1,0 +1,65 @@
+OASISFormat: 0.3
+Name: rtime
+Version: 0.9.2
+Synopsis: Timelines for OCaml's React module
+Authors: Daniel Bünzli <daniel.buenzli at erratique.ch>
+Copyrights: (c) 2009-2012 Daniel C. Bünzli
+License: BSD3
+Homepage: http://erratique.ch/software/rtime
+Description:
+ Rtime is an OCaml module implementing timelines for [React][1].  It
+ manages time stamp events, delayed events and delayed signals along
+ timelines. The client chooses the concrete timeline by providing an
+ absolute notion of time. Running the timeline at the appropriate pace
+ is left to the client.
+ .
+ Rtime is made of a single module and depends on [React][1]. It is
+ distributed under the BSD3 license.
+ .
+ [1]: http://erratique.ch/software/react
+
+OCamlVersion: >= 3.11.0
+Plugins: META (0.3)
+BuildTools:ocamlbuild
+
+Library rtime
+ Path: src
+ Modules: Rtime
+ BuildDepends: react
+
+Executable examples
+ Path: test
+ MainIs: examples.ml
+ CompiledObject: Best
+ BuildDepends: unix, threads, react, rtime
+ Install: false
+
+Executable test
+ Path: test
+ MainIs: test.ml
+ CompiledObject: Best
+ BuildDepends: unix, threads, react, rtime
+ Install: false
+
+Test test
+ Command: $test
+
+Document api
+ Title: Rtime's documentation and API reference
+ Type: ocamlbuild (0.3)
+ BuildTools+: ocamldoc
+ XOCamlbuildLibraries: rtime
+ XOCamlbuildPath: doc
+
+Document distribution
+ Title: "Rtime's README and CHANGES files"
+ DataFiles: README CHANGES
+
+Document samples
+ Title: "Rtime's sample code"
+ DataFiles: test/*.ml
+
+SourceRepository head
+ Type: git
+ Location: git://erratique.ch/repos/rtime.git
+ Browser: http://erratique.ch/repos/rtime
