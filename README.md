@@ -40,8 +40,7 @@ distribution.
 ## Sample programs
 
 If you installed Rtime with `opam` sample programs are located in
-the directory `opam config var rtime:doc`. These programs define
-the command line of some classic programs.
+the directory `opam config var rtime:doc`.
 
 In the distribution sample programs are located in the `test`
 directory of the distribution. They can be built with:
