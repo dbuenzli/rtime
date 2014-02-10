@@ -1,0 +1,8 @@
+version = "%%VERSION%%"
+description = "Timelines for react"
+requires = "react"
+archive(byte) = "rtime.cma"
+archive(byte, plugin) = "rtime.cma"
+archive(native) = "rtime.cmxa"
+archive(native, plugin) = "rtime.cmxs"
+exists_if = "rtime.cma"
