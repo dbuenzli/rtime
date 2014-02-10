@@ -1,0 +1,14 @@
+opam-version: "1"
+maintainer: "Daniel Bünzli <daniel.buenzl i@erratique.ch>"
+homepage: "http://erratique.ch/software/rtime"
+authors: ["Daniel Bünzli <daniel.buenzli i@erratique.ch>"]
+doc: "http://erratique.ch/software/rtime/doc/Rtime"
+tags: [ "reactive" "declarative" "frp" "time" ]
+license: "BSD3"
+depends: [ "ocamlfind" "react" ]
+ocaml-version: [>= "4.00.0"]
+build: 
+[
+  ["./pkg/pkg-git" ] 
+  ["./pkg/build" "true" ]
+]
