@@ -2,7 +2,7 @@ Rtime — Timelines for OCaml React
 -------------------------------------------------------------------------------
 Release %%VERSION%%
 
-*WARNING* This module is deprecated and no longer maintained.
+**WARNING** This module is deprecated and no longer maintained.
 
 Rtime is an OCaml module implementing timelines for [React][1].  It
 manages time stamp events, delayed events and delayed signals along
